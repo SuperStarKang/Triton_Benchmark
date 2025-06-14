@@ -298,7 +298,7 @@ class SequentialBenchmark:
         """비교 결과 출력"""
         print(f"\n📊 Sequential Results for {name}:")
         print("-" * 60)
-        
+
         # 메모리 결과
         print("💾 Memory Results:")
         if "naive" in memory_result and "optimized" in memory_result:

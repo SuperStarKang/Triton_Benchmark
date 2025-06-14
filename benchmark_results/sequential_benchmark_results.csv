@@ -1,0 +1,2 @@
+name,naive_peak_memory_gb,naive_avg_memory_gb,optimized_peak_memory_gb,optimized_avg_memory_gb,naive_time_ms,optimized_time_ms,speedup_ratio
+GeGLU,0.018091392517089844,0.017312727476421156,0.018359947204589843,0.018259689655709774,4.708887958526612,5.75536961555481,0.8181729885427491

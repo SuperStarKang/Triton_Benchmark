@@ -31,5 +31,6 @@ __all__ = [
     'OptimizedLinearCrossEntropy', 
     'CustomFusedLinearCrossEntropyFunction',
     'create_linear_cross_entropy'
+    'LigerFusedLinearCrossEntropy'
     'LlamaForCausalLMLiger'
 ]

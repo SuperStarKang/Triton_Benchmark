@@ -5,6 +5,7 @@
 from .utils import *
 from .geglu import *
 from .fused_linear_ce import *
+from .flce import *
 
 __all__ = [
     # Utils
@@ -30,4 +31,5 @@ __all__ = [
     'OptimizedLinearCrossEntropy', 
     'CustomFusedLinearCrossEntropyFunction',
     'create_linear_cross_entropy'
+    'LlamaForCausalLMLiger'
 ]

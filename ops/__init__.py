@@ -30,4 +30,11 @@ __all__ = [
     'OptimizedLinearCrossEntropy', 
     'CustomFusedLinearCrossEntropyFunction',
     'create_linear_cross_entropy'
+
+	# Layer Normalization
+    'NaiveLayerNorm',
+    'OptimizedLayerNorm',
+    'LigerLayerNormFunction',
+    'create_layer_norm',
+    'layer_norm'
 ]

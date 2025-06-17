@@ -42,4 +42,10 @@ __all__ = [
     'LigerLayerNormFunction',
     'create_layer_norm',
     'layer_norm'
+
+	# SwiGLU
+	'NaiveSwiGLU',
+    'OptimizedSwiGLU', 
+    'LigerSiLUMulFunction',
+    'create_swiglu'
 ]

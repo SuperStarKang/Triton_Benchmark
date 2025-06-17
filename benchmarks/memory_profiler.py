@@ -488,7 +488,4 @@ __all__ = [
     'GPUMemoryMonitor',
     'memory_profiler', 
     'MemoryBenchmark',
-    'profile_operation_memory',
-    'profile_model_memory',
-    'compare_memory_usage'
 ]

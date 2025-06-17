@@ -1,5 +1,5 @@
 """
-메모리 사용량 프로파일링 도구
+메모리 사용량 프로파일링 도구 (리팩토링된 버전)
 """
 
 import torch
@@ -95,252 +95,249 @@ def memory_profiler(device: str = "cuda:0"):
         monitor.final_stats = stats
 
 
-def profile_operation_memory(
-    operation_func: Callable,
-    *args,
-    device: str = "cuda:0",
-    warmup_runs: int = 3,
-    profile_runs: int = 5,
-    **kwargs
-) -> Dict[str, Any]:
-    """
-    단일 연산의 메모리 사용량 프로파일링
-    
-    Args:
-        operation_func: 프로파일링할 함수
-        *args: 함수 인자들
-        device: 디바이스
-        warmup_runs: 워밍업 실행 횟수
-        profile_runs: 프로파일링 실행 횟수
-        **kwargs: 함수 키워드 인자들
-        
-    Returns:
-        메모리 사용량 통계
-    """
-    results = []
-    
-    # 워밍업
-    for _ in range(warmup_runs):
-        with torch.no_grad():
-            try:
-                _ = operation_func(*args, **kwargs)
-            except:
-                pass
-        torch.cuda.empty_cache()
-        gc.collect()
-    
-    # 실제 프로파일링
-    for run_idx in range(profile_runs):
-        with memory_profiler(device) as monitor:
-            try:
-                result = operation_func(*args, **kwargs)
-                # gradient 계산이 필요한 경우
-                if hasattr(result, 'backward') and result.requires_grad:
-                    dummy_loss = result.sum()
-                    dummy_loss.backward()
-            except Exception as e:
-                print(f"Error in run {run_idx}: {e}")
-                continue
-        
-        if hasattr(monitor, 'final_stats'):
-            results.append(monitor.final_stats)
-        
-        # 메모리 정리
-        torch.cuda.empty_cache()
-        gc.collect()
-    
-    if not results:
-        return {}
-    
-    # 평균 통계 계산
-    avg_stats = {}
-    for key in results[0].keys():
-        values = [r[key] for r in results if key in r]
-        if values:
-            avg_stats[f"avg_{key}"] = sum(values) / len(values)
-            avg_stats[f"max_{key}"] = max(values)
-            avg_stats[f"min_{key}"] = min(values)
-    
-    return avg_stats
-
-
-def profile_model_memory(
-    model: torch.nn.Module,
-    input_data: torch.Tensor,
-    targets: torch.Tensor = None,
-    device: str = "cuda:0",
-    include_backward: bool = True
-) -> Dict[str, float]:
-    """
-    모델 전체의 메모리 사용량 프로파일링
-    
-    Args:
-        model: 프로파일링할 모델
-        input_data: 입력 데이터
-        targets: 타겟 데이터 (loss 계산용)
-        device: 디바이스
-        include_backward: backward pass 포함 여부
-        
-    Returns:
-        메모리 사용량 통계
-    """
-    model.eval()
-    
-    def model_forward():
-        if targets is not None:
-            # 학습 모드로 설정
-            model.train()
-            output = model(input_data, targets)
-            return output
-        else:
-            # 추론 모드
-            with torch.no_grad():
-                output = model(input_data)
-            return output
-    
-    def model_forward_backward():
-        model.train()
-        if targets is not None:
-            loss = model(input_data, targets)
-            loss.backward()
-            return loss
-        else:
-            output = model(input_data)
-            # 더미 손실로 backward 수행
-            dummy_loss = output.sum()
-            dummy_loss.backward()
-            return dummy_loss
-    
-    # Forward pass 메모리 프로파일링
-    forward_stats = profile_operation_memory(
-        model_forward,
-        device=device,
-        warmup_runs=2,
-        profile_runs=3
-    )
-    
-    # Forward + Backward pass 메모리 프로파일링 (옵션)
-    if include_backward:
-        backward_stats = profile_operation_memory(
-            model_forward_backward,
-            device=device,
-            warmup_runs=2,
-            profile_runs=3
-        )
-        
-        # 결과 통합
-        combined_stats = {}
-        for key, value in forward_stats.items():
-            combined_stats[f"forward_{key}"] = value
-        for key, value in backward_stats.items():
-            combined_stats[f"backward_{key}"] = value
-        
-        return combined_stats
-    
-    return forward_stats
-
-
-def compare_memory_usage(
-    naive_func: Callable,
-    optimized_func: Callable,
-    *args,
-    device: str = "cuda:0",
-    **kwargs
-) -> Dict[str, Any]:
-    """
-    두 구현의 메모리 사용량 비교
-    
-    Args:
-        naive_func: 표준 구현 함수
-        optimized_func: 최적화 구현 함수
-        *args: 함수 인자들
-        device: 디바이스
-        **kwargs: 함수 키워드 인자들
-        
-    Returns:
-        비교 결과
-    """
-    print("Profiling naive implementation...")
-    naive_stats = profile_operation_memory(naive_func, *args, device=device, **kwargs)
-    
-    print("Profiling optimized implementation...")
-    optimized_stats = profile_operation_memory(optimized_func, *args, device=device, **kwargs)
-    
-    # 개선율 계산
-    comparison = {
-        "naive": naive_stats,
-        "optimized": optimized_stats,
-        "improvement": {}
-    }
-    
-    # 주요 메트릭들에 대한 개선율 계산
-    key_metrics = ["avg_peak_memory_gb", "avg_avg_memory_gb", "avg_memory_increase_gb"]
-    
-    for metric in key_metrics:
-        if metric in naive_stats and metric in optimized_stats:
-            naive_val = naive_stats[metric]
-            opt_val = optimized_stats[metric]
-            
-            if naive_val > 0:
-                improvement_pct = ((naive_val - opt_val) / naive_val) * 100
-                comparison["improvement"][metric] = improvement_pct
-    
-    return comparison
-
-
 class MemoryBenchmark:
-    """메모리 벤치마크 실행기"""
+    """메모리 벤치마크 실행기 (리팩토링된 버전)"""
     
     def __init__(self, device: str = "cuda:0"):
         self.device = device
         self.results = {}
     
-    def benchmark_operation(
+    def profile_operation_memory(
         self,
-        name: str,
-        naive_func: Callable,
-        optimized_func: Callable,
+        operation_func: Callable,
         *args,
+        warmup_runs: int = 3,
+        profile_runs: int = 5,
         **kwargs
-    ):
-        """단일 연산 벤치마크"""
-        print(f"\n=== Benchmarking {name} ===")
+    ) -> Dict[str, Any]:
+        """
+        단일 연산의 메모리 사용량 프로파일링
         
-        comparison = compare_memory_usage(
-            naive_func, optimized_func, *args, device=self.device, **kwargs
-        )
+        Args:
+            operation_func: 프로파일링할 함수
+            *args: 함수 인자들
+            warmup_runs: 워밍업 실행 횟수
+            profile_runs: 프로파일링 실행 횟수
+            **kwargs: 함수 키워드 인자들
+            
+        Returns:
+            메모리 사용량 통계
+        """
+        results = []
         
-        self.results[name] = comparison
+        # 워밍업
+        for _ in range(warmup_runs):
+            with torch.no_grad():
+                try:
+                    _ = operation_func(*args, **kwargs)
+                except:
+                    pass
+            torch.cuda.empty_cache()
+            gc.collect()
         
-        # 결과 출력
-        self._print_operation_results(name, comparison)
-    
-    def benchmark_model(
+        # 실제 프로파일링
+        for run_idx in range(profile_runs):
+            with memory_profiler(self.device) as monitor:
+                try:
+                    result = operation_func(*args, **kwargs)
+                    # gradient 계산이 필요한 경우
+                    if hasattr(result, 'backward') and result.requires_grad:
+                        dummy_loss = result.sum()
+                        dummy_loss.backward()
+                except Exception as e:
+                    print(f"Error in run {run_idx}: {e}")
+                    continue
+            
+            if hasattr(monitor, 'final_stats'):
+                results.append(monitor.final_stats)
+            
+            # 메모리 정리
+            torch.cuda.empty_cache()
+            gc.collect()
+        
+        if not results:
+            return {}
+        
+        # 평균 통계 계산
+        avg_stats = {}
+        for key in results[0].keys():
+            values = [r[key] for r in results if key in r]
+            if values:
+                avg_stats[f"avg_{key}"] = sum(values) / len(values)
+                avg_stats[f"max_{key}"] = max(values)
+                avg_stats[f"min_{key}"] = min(values)
+        
+        return avg_stats
+
+    def profile_model_memory(
         self,
-        name: str,
-        naive_model: torch.nn.Module,
-        optimized_model: torch.nn.Module,
+        model: torch.nn.Module,
         input_data: torch.Tensor,
-        targets: torch.Tensor = None
-    ):
-        """모델 전체 벤치마크"""
-        print(f"\n=== Benchmarking Model: {name} ===")
+        targets: torch.Tensor = None,
+        include_backward: bool = True,
+        warmup_runs: int = 2,
+        profile_runs: int = 3
+    ) -> Dict[str, float]:
+        """
+        모델 전체의 메모리 사용량 프로파일링
         
-        # 모델들을 디바이스로 이동
-        naive_model = naive_model.to(self.device)
-        optimized_model = optimized_model.to(self.device)
+        Args:
+            model: 프로파일링할 모델
+            input_data: 입력 데이터
+            targets: 타겟 데이터 (loss 계산용)
+            include_backward: backward pass 포함 여부
+            warmup_runs: 워밍업 실행 횟수
+            profile_runs: 프로파일링 실행 횟수
+            
+        Returns:
+            메모리 사용량 통계
+        """
+        # 모델과 데이터를 디바이스로 이동
+        model = model.to(self.device)
         input_data = input_data.to(self.device)
         if targets is not None:
             targets = targets.to(self.device)
         
+        model.eval()
+        
+        def model_forward():
+            if targets is not None:
+                # 학습 모드로 설정
+                model.train()
+                output = model(input_data, targets)
+                return output
+            else:
+                # 추론 모드
+                with torch.no_grad():
+                    output = model(input_data)
+                return output
+        
+        def model_forward_backward():
+            model.train()
+            if targets is not None:
+                loss = model(input_data, targets)
+                loss.backward()
+                return loss
+            else:
+                output = model(input_data)
+                # 더미 손실로 backward 수행
+                dummy_loss = output.sum()
+                dummy_loss.backward()
+                return dummy_loss
+        
+        # Forward pass 메모리 프로파일링
+        forward_stats = self.profile_operation_memory(
+            model_forward,
+            warmup_runs=warmup_runs,
+            profile_runs=profile_runs
+        )
+        
+        # Forward + Backward pass 메모리 프로파일링 (옵션)
+        if include_backward:
+            backward_stats = self.profile_operation_memory(
+                model_forward_backward,
+                warmup_runs=warmup_runs,
+                profile_runs=profile_runs
+            )
+            
+            # 결과 통합
+            combined_stats = {}
+            for key, value in forward_stats.items():
+                combined_stats[f"forward_{key}"] = value
+            for key, value in backward_stats.items():
+                combined_stats[f"backward_{key}"] = value
+            
+            return combined_stats
+        
+        return forward_stats
+
+    def compare_memory_usage(
+        self,
+        naive_func: Callable,
+        optimized_func: Callable,
+        *args,
+        warmup_runs: int = 3,
+        profile_runs: int = 5,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        두 구현의 메모리 사용량 비교
+        
+        Args:
+            naive_func: 표준 구현 함수
+            optimized_func: 최적화 구현 함수
+            *args: 함수 인자들
+            warmup_runs: 워밍업 실행 횟수
+            profile_runs: 프로파일링 실행 횟수
+            **kwargs: 함수 키워드 인자들
+            
+        Returns:
+            비교 결과
+        """
+        print("Profiling naive implementation...")
+        naive_stats = self.profile_operation_memory(
+            naive_func, *args, warmup_runs=warmup_runs, profile_runs=profile_runs, **kwargs
+        )
+        
+        print("Profiling optimized implementation...")
+        optimized_stats = self.profile_operation_memory(
+            optimized_func, *args, warmup_runs=warmup_runs, profile_runs=profile_runs, **kwargs
+        )
+        
+        # 개선율 계산
+        comparison = {
+            "naive": naive_stats,
+            "optimized": optimized_stats,
+            "improvement": {}
+        }
+        
+        # 주요 메트릭들에 대한 개선율 계산
+        key_metrics = ["avg_peak_memory_gb", "avg_avg_memory_gb", "avg_memory_increase_gb"]
+        
+        for metric in key_metrics:
+            if metric in naive_stats and metric in optimized_stats:
+                naive_val = naive_stats[metric]
+                opt_val = optimized_stats[metric]
+                
+                if naive_val > 0:
+                    improvement_pct = ((naive_val - opt_val) / naive_val) * 100
+                    comparison["improvement"][metric] = improvement_pct
+        
+        return comparison
+
+    def compare_model_memory(
+        self,
+        naive_model: torch.nn.Module,
+        optimized_model: torch.nn.Module,
+        input_data: torch.Tensor,
+        targets: torch.Tensor = None,
+        include_backward: bool = True,
+        warmup_runs: int = 2,
+        profile_runs: int = 3
+    ) -> Dict[str, Any]:
+        """
+        두 모델의 메모리 사용량 비교
+        
+        Args:
+            naive_model: 표준 구현 모델
+            optimized_model: 최적화 구현 모델
+            input_data: 입력 데이터
+            targets: 타겟 데이터
+            include_backward: backward pass 포함 여부
+            warmup_runs: 워밍업 실행 횟수
+            profile_runs: 프로파일링 실행 횟수
+            
+        Returns:
+            비교 결과
+        """
         print("Profiling naive model...")
-        naive_stats = profile_model_memory(
-            naive_model, input_data, targets, self.device
+        naive_stats = self.profile_model_memory(
+            naive_model, input_data, targets, include_backward, warmup_runs, profile_runs
         )
         
         print("Profiling optimized model...")
-        optimized_stats = profile_model_memory(
-            optimized_model, input_data, targets, self.device
+        optimized_stats = self.profile_model_memory(
+            optimized_model, input_data, targets, include_backward, warmup_runs, profile_runs
         )
         
         # 비교 결과 저장
@@ -351,7 +348,8 @@ class MemoryBenchmark:
         }
         
         # 개선율 계산
-        for phase in ["forward", "backward"]:
+        phases = ["forward", "backward"] if include_backward else ["forward"]
+        for phase in phases:
             for metric_type in ["avg_peak_memory_gb", "avg_avg_memory_gb"]:
                 naive_key = f"{phase}_{metric_type}"
                 opt_key = f"{phase}_{metric_type}"
@@ -364,11 +362,8 @@ class MemoryBenchmark:
                         improvement_pct = ((naive_val - opt_val) / naive_val) * 100
                         comparison["improvement"][naive_key] = improvement_pct
         
-        self.results[f"model_{name}"] = comparison
-        
-        # 결과 출력
-        self._print_model_results(name, comparison)
-    
+        return comparison
+
     def _print_operation_results(self, name: str, comparison: Dict):
         """연산 결과 출력"""
         naive = comparison["naive"]
@@ -397,7 +392,7 @@ class MemoryBenchmark:
                     imp_pct = improvement[metric_key]
                     print(f"  Improvement: {imp_pct:.2f}%")
                 print()
-    
+
     def _print_model_results(self, name: str, comparison: Dict):
         """모델 결과 출력"""
         naive = comparison["naive"]
@@ -407,7 +402,13 @@ class MemoryBenchmark:
         print(f"\nModel Results for {name}:")
         print("-" * 50)
         
-        for phase in ["forward", "backward"]:
+        phases = []
+        if any(key.startswith("forward_") for key in naive.keys()):
+            phases.append("forward")
+        if any(key.startswith("backward_") for key in naive.keys()):
+            phases.append("backward")
+        
+        for phase in phases:
             print(f"\n{phase.capitalize()} Pass:")
             
             for metric_name, metric_suffix in [("Peak Memory", "peak_memory_gb"), ("Average Memory", "avg_memory_gb")]:
@@ -425,7 +426,7 @@ class MemoryBenchmark:
                     if naive_key in improvement:
                         imp_pct = improvement[naive_key]
                         print(f"    Improvement: {imp_pct:.2f}%")
-    
+
     def get_summary(self) -> Dict[str, Any]:
         """벤치마크 결과 요약 반환"""
         summary = {
@@ -458,12 +459,33 @@ class MemoryBenchmark:
         
         return summary
 
+    def clear_results(self):
+        """결과 초기화"""
+        self.results.clear()
+
+    def save_results(self, filepath: str):
+        """결과를 JSON 파일로 저장"""
+        import json
+        
+        def make_json_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_json_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_json_serializable(item) for item in obj]
+            elif isinstance(obj, (int, float, str, bool, type(None))):
+                return obj
+            else:
+                return str(obj)
+        
+        serializable_results = make_json_serializable(self.results)
+        
+        with open(filepath, "w") as f:
+            json.dump(serializable_results, f, indent=2)
+        
+        print(f"Results saved to {filepath}")
 
 __all__ = [
     'GPUMemoryMonitor',
     'memory_profiler', 
-    'profile_operation_memory',
-    'profile_model_memory',
-    'compare_memory_usage',
-    'MemoryBenchmark'
+    'MemoryBenchmark',
 ]

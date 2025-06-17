@@ -2,13 +2,10 @@
 모델 아키텍처 패키지
 """
 
-from .transformer import *
+from .simple_language_model import *
 
 __all__ = [
-    'MultiHeadAttention',
-    'FeedForward',
-    'TransformerBlock', 
-    'OptimizedTransformer',
-    'NaiveTransformer',
-    'create_transformer'
+    'SimpleTransformerBlock',
+    'SimpleLanguageModel',
+    'create_simple_language_model'
 ]

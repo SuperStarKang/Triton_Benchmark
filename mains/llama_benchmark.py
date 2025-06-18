@@ -55,7 +55,7 @@ def main():
         "vocab_size": 32000,
         "hidden_size": 768,
         "intermediate_size": 768,
-        "num_layers": 8
+        "num_layers": 16
     }
     
     print(f"Llama Language Model Memory Benchmark")

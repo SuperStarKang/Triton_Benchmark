@@ -6,7 +6,8 @@ import torch
 
 # 메모리 벤치마킹 도구 import
 from benchmarks.memory_profiler import MemoryBenchmark
-from benchmarks.visualizer import BenchmarkVisualizer
+from benchmarks.speed_profiler import SpeedBenchmark
+from benchmarks.operation_visualizer import BenchmarkVisualizer
 
 # GeGLU 구현들 import
 from ops.geglu import create_geglu
@@ -60,7 +61,7 @@ def main():
 		
 	# 결과 출력
 	memory_benchmark._print_operation_results("GeGLU_Forward", forward_comparison)
-		
+
 	# 2. Forward + Backward 메모리 벤치마킹
 	input_tensor.requires_grad = True  # Forward + Backward 벤치마킹을 위해 requires_grad=True로 설정
 	print("\n2. Forward + Backward Memory Benchmarking")
@@ -90,6 +91,33 @@ def main():
 	visualizer.plot_memory_comparison(
 		memory_benchmark.results,
 		save_name="geglu_memory_comparison"
+	)
+
+	# 6. 실행 속도 벤치마킹
+	print("=" * 50)
+	print("\nSpeed Benchmarking")
+	speed_benchmark = SpeedBenchmark(device)
+	
+	speed_comparison = speed_benchmark.compare_speed(
+		lambda: naive_model(input_tensor),
+		lambda: optimized_model(input_tensor),
+		warmup_runs=3,
+		profile_runs=5
+	)
+	
+	# 결과 출력
+	speed_benchmark._print_operation_results("GeGLU_Speed", speed_comparison)
+	
+	# 결과를 벤치마크 인스턴스에 저장
+	speed_benchmark.results["GeGLU_Speed"] = speed_comparison
+	
+	# 실행 속도 결과를 json 형태로 저장
+	# speed_benchmark.save_results("./benchmark_results/geglu_speed_benchmark_results.json")
+
+	# 실행 속도 결과 시각화
+	visualizer.plot_speed_comparison(
+		speed_benchmark.results,
+		save_name="geglu_speed_comparison"
 	)
 
 if __name__ == "__main__":

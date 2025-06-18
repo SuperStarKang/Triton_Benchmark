@@ -6,7 +6,7 @@ import torch
 
 # 메모리 벤치마킹 도구 import
 from benchmarks.memory_profiler import MemoryBenchmark
-from benchmarks.visualizer import BenchmarkVisualizer
+from LigerKernel.research.benchmarks.operation_visualizer import BenchmarkVisualizer
 
 # FLCE 구현들 import
 from ops.fused_linear_ce import create_linear_cross_entropy

@@ -5,47 +5,52 @@
 from .utils import *
 from .geglu import *
 from .fused_linear_ce import *
-from .flce import *
 
 __all__ = [
-    # Utils
-    'calculate_settings',
-    'ensure_contiguous',
-    'tanh',
-    'SQRT_2_OVER_PI', 
-    'GELU_TANH_COEFF',
-    'get_cuda_capability',
-    'optimize_memory_config',
-    'estimate_tensor_memory',
-    'TritonKernelProfiler',
-    'kernel_profiler',
-    
-    # GeGLU
-    'NaiveGeGLU',
-    'OptimizedGeGLU',
-    'LigerGELUMulFunction',
-    'create_geglu',
-    
-    # Fused Linear CE
-    'NaiveLinearCrossEntropy',
-    'OptimizedLinearCrossEntropy', 
-    'CustomFusedLinearCrossEntropyFunction',
-    'create_linear_cross_entropy'
+	# Utils
+	'calculate_settings',
+	'ensure_contiguous',
+	'tanh',
+	'SQRT_2_OVER_PI', 
+	'GELU_TANH_COEFF',
+	'get_cuda_capability',
+	'optimize_memory_config',
+	'estimate_tensor_memory',
+	'TritonKernelProfiler',
+	'kernel_profiler',
 
-    'LigerFusedLinearCrossEntropy'
-    'LlamaForCausalLMLiger'
+	# GeGLU
+	'NaiveGeGLU',
+	'OptimizedGeGLU',
+	'LigerGELUMulFunction',
+	'create_geglu',
+
+	# Fused Linear CE
+	'NaiveLinearCrossEntropy',
+	'OptimizedLinearCrossEntropy', 
+	'CustomFusedLinearCrossEntropyFunction',
+	'create_linear_cross_entropy'
+
+	'LigerFusedLinearCrossEntropy'
+	'LlamaForCausalLMLiger'
 
 
 	# Layer Normalization
-    'NaiveLayerNorm',
-    'OptimizedLayerNorm',
-    'LigerLayerNormFunction',
-    'create_layer_norm',
-    'layer_norm'
+	'NaiveLayerNorm',
+	'OptimizedLayerNorm',
+	'LigerLayerNormFunction',
+	'create_layer_norm',
+	'layer_norm'
 
 	# SwiGLU
 	'NaiveSwiGLU',
-    'OptimizedSwiGLU', 
-    'LigerSiLUMulFunction',
-    'create_swiglu'
+	'OptimizedSwiGLU', 
+	'LigerSiLUMulFunction',
+	'create_swiglu'
+
+	# RMS Normalization
+	'NaiveRMSNorm',
+	'OptimizedRMSNorm',
+	'LigerRMSNormFunction',
+	'create_rms_norm'
 ]

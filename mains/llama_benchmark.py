@@ -50,7 +50,7 @@ def main():
 
     # 벤치마크 파라미터
     configs = {
-        "batch_size": 32,
+        "batch_size": 128,
         "seq_len": 128,
         "vocab_size": 32000,
         "hidden_size": 768,

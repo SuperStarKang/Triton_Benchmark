@@ -4,7 +4,8 @@
 
 from .memory_profiler import *
 from .speed_profiler import *
-from .visualizer import *
+from .operation_visualizer import *
+from .model_visualizer import *
 
 __all__ = [
     # Memory profiling

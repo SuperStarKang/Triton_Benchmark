@@ -1,5 +1,5 @@
 """
-간단한 모델 메모리 벤치마킹 메인 함수
+간단한 모델 메모리 벤치마킹 메인 함수 (수정 버전)
 """
 
 import torch
@@ -7,13 +7,12 @@ import torch
 # 메모리 벤치마킹 도구 import
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from benchmarks.memory_profiler import MemoryBenchmark
-from benchmarks.visualizer import BenchmarkVisualizer
+from benchmarks.model_visualizer import BenchmarkVisualizer
 
 # 모델 import
-from models.simple_language_model import create_simple_language_model
+from models.llama_gemma_model import create_llama_style_model
 
 
 def create_test_data(batch_size, seq_len, vocab_size, device):
@@ -23,7 +22,10 @@ def create_test_data(batch_size, seq_len, vocab_size, device):
     return input_ids, targets
 
 def create_model_wrapper(model, input_ids, targets):
-    """매번 새로운 데이터로 모델을 실행하는 wrapper"""
+    """
+    매번 새로운 데이터로 모델을 실행하는 wrapper
+    PyTorch 내부 graph reuse 최적화 방지
+    """
     def model_func():
         # 매번 새로운 입력 데이터 생성 (올바른 device에 생성)
         device = input_ids.device
@@ -36,7 +38,7 @@ def create_model_wrapper(model, input_ids, targets):
         model.zero_grad()
         
         return model(new_input_ids, new_targets)
-    
+        
     return model_func
 
 
@@ -48,15 +50,15 @@ def main():
 
     # 벤치마크 파라미터
     configs = {
-        "batch_size": 48,
+        "batch_size": 32,
         "seq_len": 128,
         "vocab_size": 32000,
         "hidden_size": 768,
         "intermediate_size": 768,
-        "num_layers": 2
+        "num_layers": 8
     }
     
-    print(f"Simple Language Model Memory Benchmark")
+    print(f"Llama Language Model Memory Benchmark")
     print(f"Device: {device}")
     print(f"Input shape: ({configs['batch_size']}, {configs['seq_len']})")
     print(f"Model config: hidden={configs['hidden_size']}, intermediate={configs['intermediate_size']}, layers={configs['num_layers']}")
@@ -79,7 +81,7 @@ def main():
 
     # 1. Naive 모델 벤치마킹
     print("\n=== NAIVE MODEL BENCHMARKING ===")
-    naive_model = create_simple_language_model(
+    naive_model = create_llama_style_model(
         vocab_size=configs['vocab_size'],
         hidden_size=configs['hidden_size'],
         intermediate_size=configs['intermediate_size'],
@@ -89,17 +91,17 @@ def main():
     
     print(f"Model parameters: {naive_model.get_num_parameters():,}")
     print(f"Model size: ~{naive_model.get_model_size_mb():.1f} MB")
-    
+
     # 모델 wrapper 생성 (매번 새로운 데이터 사용)
     naive_model_func = create_model_wrapper(naive_model, input_ids, targets)
-    
+
     # operation_memory로 직접 벤치마킹 (graph 재사용 문제 해결)
     naive_stats = memory_benchmark.profile_operation_memory(
         naive_model_func,
         warmup_runs=2,
-        profile_runs=3
+        profile_runs=5
     )
-    
+
     print(f"Naive Peak Memory: {naive_stats.get('avg_peak_memory_gb', 0):.4f} GB")
     print(f"Naive Avg Memory: {naive_stats.get('avg_avg_memory_gb', 0):.4f} GB")
     
@@ -109,7 +111,7 @@ def main():
     
     # 2. Optimized 모델 벤치마킹
     print("\n=== OPTIMIZED MODEL BENCHMARKING ===")
-    optimized_model = create_simple_language_model(
+    optimized_model = create_llama_style_model(
         vocab_size=configs['vocab_size'],
         hidden_size=configs['hidden_size'],
         intermediate_size=configs['intermediate_size'],
@@ -124,7 +126,7 @@ def main():
     optimized_stats = memory_benchmark.profile_operation_memory(
         optimized_model_func,
         warmup_runs=2,
-        profile_runs=3
+        profile_runs=5
     )
     
     print(f"Optimized Peak Memory: {optimized_stats.get('avg_peak_memory_gb', 0):.4f} GB")
@@ -158,26 +160,26 @@ def main():
     model_comparison = calculate_improvement(naive_stats, optimized_stats)
     
     # 4. 결과 저장
-    memory_benchmark.results["SimpleLanguageModel"] = model_comparison
-    # memory_benchmark.save_results("./benchmark_results/model_memory_benchmark_results.json")
-
+    memory_benchmark.results["LlamaLanguageModel"] = model_comparison
+    
+    # 결과 출력
+    print("\n=== COMPARISON RESULTS ===")
+    print(f"Peak Memory Improvement: {model_comparison['improvement'].get('avg_peak_memory_gb', 0):.2f}%")
+    print(f"Average Memory Improvement: {model_comparison['improvement'].get('avg_avg_memory_gb', 0):.2f}%")
+    
     # 5. 벤치마크 결과 시각화
+    print("\n=== GENERATING VISUALIZATIONS ===")
     visualizer = BenchmarkVisualizer("./benchmark_results")
-    
-    # 모델 비교 시각화
-    dummy_speed_results = {
-        "SimpleLanguageModel": {
-            "naive": {"total": {"mean_time_ms": 100.0}},
-            "optimized": {"total": {"mean_time_ms": 80.0}},
-            "speedup": {"total": {"speedup_ratio": 1.25, "improvement_pct": 20.0}}
-        }
-    }
-    
-    visualizer.plot_model_comparison(
-        {"SimpleLanguageModel": model_comparison},
-        dummy_speed_results,
-        save_name="model_memory_comparison"
+
+    # 메모리 세부 분석 그래프
+    visualizer.plot_memory_breakdown(
+        {"LlamaLanguageModel": model_comparison},
+        save_name="Llama_model_memory_breakdown"
     )
+    
+    print("\n=== BENCHMARK COMPLETED ===")
+    print("All visualizations and results have been saved to ./benchmark_results/")
+
 
 if __name__ == "__main__":
     main()

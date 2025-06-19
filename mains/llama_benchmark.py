@@ -50,12 +50,12 @@ def main():
 
     # 벤치마크 파라미터
     configs = {
-        "batch_size": 128,
+        "batch_size": 16,
         "seq_len": 128,
         "vocab_size": 32000,
         "hidden_size": 768,
         "intermediate_size": 768,
-        "num_layers": 8
+        "num_layers": 32
     }
     
     print(f"Llama Language Model Memory Benchmark")

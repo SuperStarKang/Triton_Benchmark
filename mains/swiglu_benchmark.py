@@ -6,7 +6,7 @@ import torch
 
 # 메모리 벤치마킹 도구 import
 from benchmarks.memory_profiler import MemoryBenchmark
-from LigerKernel.research.benchmarks.operation_visualizer import BenchmarkVisualizer
+from benchmarks.operation_visualizer import BenchmarkVisualizer
 
 # SwiGLU 구현들 import
 from ops.swiglu import create_swiglu
